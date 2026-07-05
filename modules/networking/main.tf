@@ -41,6 +41,42 @@ resource "azurerm_network_security_group" "wan" {
   location            = var.location
   tags                = var.tags
 
+  # Permite trafego destinado a interface WAN do firewall Mikrotik
+  # (aslfwus2, IP estatico 192.168.15.254). Prioridade menor que
+  # DenyAllFromWanToLan e DenyInternetInbound para ser avaliada primeiro.
+  security_rule {
+    name                       = "AllowAllInToFirewall"
+    priority                   = 3990
+    direction                  = "Inbound"
+    access                     = "Allow"
+    protocol                   = "*"
+    source_port_range          = "*"
+    destination_port_range     = "*"
+    source_address_prefix      = "*"
+    destination_address_prefix = "192.168.15.254"
+  }
+
+  # Bloqueia trafego vindo da WANSubnet com destino as redes internas
+  # (LANSubnet + AVDSubnet), forcando que toda comunicacao WAN -> interna
+  # passe pelo firewall Mikrotik (que tem suas proprias regras de roteamento
+  # dentro do RouterOS) em vez de trafegar direto pela rede do Azure.
+  #
+  # OBS: o range pedido originalmente (10.172.30.0/22) nao e um CIDR valido
+  # (30 nao e multiplo de 4 para /22) e tambem nao cobre a AVDSubnet. Foi
+  # substituido pelos dois blocos reais usados no address_space da VNet:
+  # 10.172.28.0/22 (contem a LANSubnet) e 10.172.32.0/24 (AVDSubnet).
+  security_rule {
+    name                         = "DenyAllFromWanToLan"
+    priority                     = 4000
+    direction                    = "Inbound"
+    access                       = "Deny"
+    protocol                     = "*"
+    source_port_range            = "*"
+    destination_port_range       = "*"
+    source_address_prefix        = "192.168.14.0/23"
+    destination_address_prefixes = ["10.172.28.0/22", "10.172.32.0/24"]
+  }
+
   security_rule {
     name                       = "DenyInternetInbound"
     priority                   = 200

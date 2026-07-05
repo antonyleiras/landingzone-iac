@@ -1,0 +1,98 @@
+name: Mikrotik CHR - Preparar VHD
+
+# Workflow manual: baixa o VHDX do CHR direto do site do Mikrotik, converte
+# para VHD de tamanho fixo (requisito do Azure para managed disks) usando
+# qemu-img num runner Linux normal (sem precisar de Windows/Hyper-V), e sobe
+# o resultado como page blob no storage account criado pelo Terraform.
+#
+# Rode este workflow DEPOIS que "terraform apply" já tiver criado o storage
+# account/container (mikrotik_storage_account_name / mikrotik_vhd_container_name)
+# e ANTES de mudar deploy_mikrotik_firewall para true.
+
+on:
+  workflow_dispatch:
+    inputs:
+      chr_version:
+        description: "Versao do RouterOS CHR a baixar (ex: 7.21.4)"
+        required: true
+        default: "7.21.4"
+      force_overwrite:
+        description: "Sobrescrever o blob mesmo se ja existir"
+        required: false
+        default: "false"
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  STORAGE_ACCOUNT_NAME: stgacctaslinfraus2
+  CONTAINER_NAME: vhds
+  BLOB_NAME: chr.vhd
+
+jobs:
+  prepare-vhd:
+    name: Download, converter e subir VHD do CHR
+    runs-on: ubuntu-latest
+    steps:
+      - name: Azure Login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Instalar qemu-img e unzip
+        run: sudo apt-get update && sudo apt-get install -y qemu-utils unzip
+
+      - name: Verificar se o blob ja existe
+        id: check
+        run: |
+          EXISTS=$(az storage blob exists \
+            --account-name "$STORAGE_ACCOUNT_NAME" \
+            --container-name "$CONTAINER_NAME" \
+            --name "$BLOB_NAME" \
+            --auth-mode login \
+            --query exists -o tsv)
+          echo "exists=$EXISTS" >> "$GITHUB_OUTPUT"
+
+      - name: Download do CHR (site oficial do Mikrotik)
+        if: steps.check.outputs.exists == 'false' || github.event.inputs.force_overwrite == 'true'
+        run: |
+          curl -fL -o chr.vhdx.zip "https://download.mikrotik.com/routeros/${{ github.event.inputs.chr_version }}/chr-${{ github.event.inputs.chr_version }}.vhdx.zip"
+          unzip -o chr.vhdx.zip
+
+      - name: Converter VHDX -> VHD fixo (qemu-img, sem Hyper-V)
+        if: steps.check.outputs.exists == 'false' || github.event.inputs.force_overwrite == 'true'
+        run: |
+          VHDX_FILE=$(ls *.vhdx)
+          qemu-img convert -f vhdx -O vpc -o subformat=fixed "$VHDX_FILE" chr.vhd
+
+          # Azure exige que o tamanho do VHD seja multiplo de 1 MiB.
+          SIZE=$(stat -c%s chr.vhd)
+          ALIGN=$((1024 * 1024))
+          REMAINDER=$((SIZE % ALIGN))
+          if [ "$REMAINDER" -ne 0 ]; then
+            NEWSIZE=$(((SIZE / ALIGN + 1) * ALIGN))
+            qemu-img resize -f vpc chr.vhd "$NEWSIZE"
+          fi
+
+      - name: Upload do VHD para o Storage Account (page blob)
+        if: steps.check.outputs.exists == 'false' || github.event.inputs.force_overwrite == 'true'
+        run: |
+          az storage blob upload \
+            --account-name "$STORAGE_ACCOUNT_NAME" \
+            --container-name "$CONTAINER_NAME" \
+            --name "$BLOB_NAME" \
+            --file chr.vhd \
+            --type page \
+            --auth-mode login \
+            --overwrite true
+
+      - name: Resumo
+        run: |
+          echo "## Upload do VHD do Mikrotik CHR" >> "$GITHUB_STEP_SUMMARY"
+          echo "Versao solicitada: ${{ github.event.inputs.chr_version }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "Blob ja existia antes deste run: ${{ steps.check.outputs.exists }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "Se o blob foi enviado com sucesso, mude deploy_mikrotik_firewall para true e abra o PR com o apply da VM." >> "$GITHUB_STEP_SUMMARY"

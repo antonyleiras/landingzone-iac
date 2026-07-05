@@ -1,9 +1,9 @@
 # landingzone-iac
 
-Provisionamento via Terraform da infraestrutura base (rede) para o ambiente
-Azure, aplicado **antes** do projeto `avd-entra-iac`. Este repositório não
-conhece nada sobre AVD — só entrega a rede e reserva os resource groups que
-os outros projetos vão consumir.
+Provisionamento via Terraform da infraestrutura base (rede + firewall) para o
+ambiente Azure, aplicado **antes** do projeto `avd-entra-iac`. Este
+repositório não conhece nada sobre AVD — entrega a rede, o firewall de borda
+e reserva os resource groups que os outros projetos vão consumir.
 
 ## Arquitetura
 
@@ -12,6 +12,8 @@ Subscription
 ├── rg-tfstate-eastus2   -> Storage Account de state (bootstrap, compartilhado
 │                            com o projeto avd-entra-iac)
 ├── rg-infra-eastus2     -> vnet-infra-eastus2 + WANSubnet + LANSubnet + AVDSubnet + 3 NSGs
+│                            + storage account stgacctaslinfraus2 (VHD do firewall)
+│                            + VM aslfwus2 (firewall Mikrotik CHR, WAN + LAN)
 └── rg-imagem-eastus2    -> reservado para golden image / Azure Compute
                              Gallery (sem recursos ainda)
 ```
@@ -32,9 +34,67 @@ subnets pedidas caem em faixas não contíguas:
 
 | Subnet | CIDR | Uso pretendido | NSG |
 |---|---|---|---|
-| `WANSubnet` | `192.168.15.0/24` | Saída/entrada externa (gateway, firewall, etc. quando existirem) | `nsg-wan-eastus2` |
-| `LANSubnet` | `10.172.31.0/24` | Tráfego interno geral | `nsg-lan-eastus2` |
+| `WANSubnet` | `192.168.15.0/24` | Firewall Mikrotik (interface WAN, IP `.254`) | `nsg-wan-eastus2` |
+| `LANSubnet` | `10.172.31.0/24` | Firewall Mikrotik (interface LAN, IP `.254`) + tráfego interno | `nsg-lan-eastus2` |
 | `AVDSubnet` | `10.172.32.0/24` | Session hosts e storage FSLogix do projeto `avd-entra-iac` | `nsg-avd-eastus2` |
+
+## Firewall Mikrotik CHR (`aslfwus2`)
+
+VM com 2 interfaces de rede, roteando tráfego entre a `WANSubnet` e a
+`LANSubnet`:
+
+| Interface | Subnet | IP privado | IP forwarding |
+|---|---|---|---|
+| WAN | `WANSubnet` | `192.168.15.254` (estático) | habilitado |
+| LAN | `LANSubnet` | `10.172.31.254` (estático) | habilitado |
+
+O `nsg-wan-eastus2` recebe duas regras específicas para o firewall (além do
+`DenyInternetInbound` já existente, prioridade 200):
+
+| Regra | Prioridade | Efeito |
+|---|---|---|
+| `AllowAllInToFirewall` | 3990 | Permite qualquer origem com destino `192.168.15.254` (IP da interface WAN do firewall) |
+| `DenyAllFromWanToLan` | 4000 | Bloqueia tráfego da `WANSubnet` (`192.168.14.0/23`) direto para as redes internas (`10.172.28.0/22` + `10.172.32.0/24`), forçando a passagem pelo firewall |
+
+> Atenção: como `DenyInternetInbound` (prioridade 200) é avaliada **antes**
+> de `AllowAllInToFirewall` (3990), qualquer tráfego que o Azure já classifique
+> com a tag `Internet` continua sendo bloqueado antes de chegar na regra de
+> permissão do firewall. Se a intenção é o Mikrotik receber tráfego vindo da
+> internet pública de fato (não só da rede WAN privada), essa regra 200
+> precisa ser revista.
+>
+> O range de destino pedido originalmente para `DenyAllFromWanToLan`
+> (`10.172.30.0/22`) também não é um CIDR válido pelo mesmo motivo do
+> `vnet_address_space` — foi substituído pelos dois blocos reais
+> (`10.172.28.0/22` + `10.172.32.0/24`) via `destination_address_prefixes`.
+
+### Por que o VHD não é gerenciado 100% pelo Terraform
+
+O Terraform não baixa arquivos da internet nem converte formatos de disco.
+Por isso o fluxo é dividido em duas partes:
+
+1. **Terraform** cria o storage account (`stgacctaslinfraus2`), o container
+   (`vhds`) e, quando `deploy_mikrotik_firewall = true`, o managed disk
+   (`create_option = Import`, lendo o blob já enviado) + a VM.
+2. **Workflow `mikrotik-vhd-prepare.yml`** (GitHub Actions, disparo manual)
+   baixa o `.vhdx.zip` direto do site do Mikrotik, converte para VHD de
+   tamanho fixo com `qemu-img` (não precisa de Windows/Hyper-V, roda num
+   runner Linux comum) e sobe como page blob no container.
+
+**Ordem obrigatória:**
+
+1. `terraform apply` com `deploy_mikrotik_firewall = false` (padrão) — cria
+   só o storage account/container.
+2. Rodar manualmente o workflow **Mikrotik CHR - Preparar VHD** (aba Actions
+   → Run workflow), informando a versão do CHR desejada.
+3. Mudar `deploy_mikrotik_firewall` para `true` (via PR) e aplicar de novo —
+   agora o managed disk consegue importar o blob e a VM é criada.
+
+Se o Service Principal do GitHub Actions não tiver a role **Storage Blob
+Data Contributor** no storage account, o passo 2 falha com 403. Conceda essa
+role manualmente (Storage Account → Access Control (IAM) → Add role
+assignment) ou preencha `mikrotik_upload_principal_object_id` com o Object
+ID do Service Principal para o Terraform criar a role automaticamente.
 
 ## Pré-requisitos
 
@@ -84,7 +144,9 @@ az ad app federated-credential create \
 ```
 
 Repita com `"subject": "repo:antonyleiras/landingzone-iac:pull_request"` e
-`"name": "github-pr"` para habilitar o `plan` em Pull Requests.
+`"name": "github-pr"` para habilitar o `plan` em Pull Requests. O workflow de
+preparo do VHD (`mikrotik-vhd-prepare.yml`, disparado manualmente na branch
+`main`) reaproveita a mesma credencial `github-main`.
 
 ### 3. Secrets do repositório (Settings > Secrets and variables > Actions)
 
@@ -121,6 +183,9 @@ Pegue o output `avd_subnet_id` (`terraform output avd_subnet_id`) e use como
 `AVD_SUBNET_ID` (secret) / `avd_subnet_id` (variável) no projeto
 `avd-entra-iac`, que deve ser aplicado em seguida.
 
+Para o firewall, siga a ordem descrita na seção **Firewall Mikrotik CHR**
+acima (apply do storage → workflow de preparo do VHD → `deploy_mikrotik_firewall = true` → novo apply).
+
 ## Próximos passos
 
 - Módulo de golden image (Azure Compute Gallery + Image Definition) dentro
@@ -128,3 +193,8 @@ Pegue o output `avd_subnet_id` (`terraform output avd_subnet_id`) e use como
   definido.
 - Avaliar Private Endpoints / Azure Firewall na `WANSubnet` se a topologia
   evoluir para hub-and-spoke.
+- Revisar a interação entre `DenyInternetInbound` (prioridade 200) e
+  `AllowAllInToFirewall` (3990) no `nsg-wan-eastus2` caso o firewall precise
+  receber tráfego da internet pública de fato.
+- Licenciamento do RouterOS (BYOL): comprar/aplicar a licença direto no
+  Mikrotik depois que a VM subir — não é gerenciado pelo Terraform.
