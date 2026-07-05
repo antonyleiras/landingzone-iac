@@ -10,11 +10,11 @@ infra_resource_group_name  = "rg-infra-eastus2"
 imagem_resource_group_name = "rg-imagem-eastus2"
 
 vnet_name          = "vnet-infra-eastus2"
-vnet_address_space = ["192.168.14.0/23", "10.172.28.0/22", "10.172.32.0/24"]
+vnet_address_space = ["192.168.14.0/23", "10.172.28.0/22"]
 
 wan_subnet_prefix = "192.168.15.0/24"
-lan_subnet_prefix = "10.172.31.0/24"
-avd_subnet_prefix = "10.172.32.0/24"
+lan_subnet_prefix = "10.172.29.0/24"
+avd_subnet_prefix = "10.172.30.0/24"
 
 nsg_wan_name = "nsg-wan-eastus2"
 nsg_lan_name = "nsg-lan-eastus2"
@@ -29,10 +29,10 @@ mikrotik_upload_principal_object_id = null # Object ID do SP do GitHub Actions (
 deploy_mikrotik_firewall = false # so vire true depois do VHD estar no storage account
 
 firewall_name                 = "aslfwus2"
-firewall_vm_size              = "Standard_B2s"
+firewall_vm_size              = "Standard_B2ats_v2"
 firewall_disk_type            = "StandardSSD_LRS"
 firewall_wan_private_ip       = "192.168.15.254"
-firewall_lan_private_ip       = "10.172.31.254"
+firewall_lan_private_ip       = "10.172.29.254"
 firewall_create_wan_public_ip = true
 
 tags = {

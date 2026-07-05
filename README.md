@@ -18,25 +18,24 @@ Subscription
                              Gallery (sem recursos ainda)
 ```
 
-A VNet tem 3 blocos de endereçamento (`address_space` é uma lista), porque as
-subnets pedidas caem em faixas não contíguas:
+A VNet tem 2 blocos de endereçamento (`address_space` é uma lista):
 
 | Bloco da VNet | Cobre |
 |---|---|
 | `192.168.14.0/23` | `WANSubnet` |
-| `10.172.28.0/22` | `LANSubnet` |
-| `10.172.32.0/24` | `AVDSubnet` |
+| `10.172.28.0/22` | `LANSubnet` + `AVDSubnet` |
 
-> O range original pensado para LAN+AVD (`10.172.30.0/22`) não é um limite
-> de rede válido para `/22` (o terceiro octeto precisa ser múltiplo de 4) e
-> também não cobria a `AVDSubnet` (`10.172.32.0/24` fica fora desse `/22`).
-> Por isso o espaço foi dividido em dois blocos.
+> O bloco `10.172.28.0/22` cobre de `10.172.28.0` a `10.172.31.255`, então
+> tanto a `LANSubnet` (`10.172.29.0/24`) quanto a `AVDSubnet`
+> (`10.172.30.0/24`) cabem dentro dele — não é mais necessário um terceiro
+> bloco de endereçamento separado (o `10.172.32.0/24` usado antes foi
+> removido do `vnet_address_space`).
 
 | Subnet | CIDR | Uso pretendido | NSG |
 |---|---|---|---|
 | `WANSubnet` | `192.168.15.0/24` | Firewall Mikrotik (interface WAN, IP `.254`) | `nsg-wan-eastus2` |
-| `LANSubnet` | `10.172.31.0/24` | Firewall Mikrotik (interface LAN, IP `.254`) + tráfego interno | `nsg-lan-eastus2` |
-| `AVDSubnet` | `10.172.32.0/24` | Session hosts e storage FSLogix do projeto `avd-entra-iac` | `nsg-avd-eastus2` |
+| `LANSubnet` | `10.172.29.0/24` | Firewall Mikrotik (interface LAN, IP `.254`) + tráfego interno | `nsg-lan-eastus2` |
+| `AVDSubnet` | `10.172.30.0/24` | Session hosts e storage FSLogix do projeto `avd-entra-iac` | `nsg-avd-eastus2` |
 
 ## Firewall Mikrotik CHR (`aslfwus2`)
 
@@ -46,27 +45,24 @@ VM com 2 interfaces de rede, roteando tráfego entre a `WANSubnet` e a
 | Interface | Subnet | IP privado | IP forwarding |
 |---|---|---|---|
 | WAN | `WANSubnet` | `192.168.15.254` (estático) | habilitado |
-| LAN | `LANSubnet` | `10.172.31.254` (estático) | habilitado |
+| LAN | `LANSubnet` | `10.172.29.254` (estático) | habilitado |
 
-O `nsg-wan-eastus2` recebe duas regras específicas para o firewall (além do
-`DenyInternetInbound` já existente, prioridade 200):
+O `nsg-wan-eastus2` tem duas regras específicas para o firewall (a regra
+genérica `DenyInternetInbound` foi removida propositalmente desta NSG — veja
+abaixo):
 
 | Regra | Prioridade | Efeito |
 |---|---|---|
 | `AllowAllInToFirewall` | 3990 | Permite qualquer origem com destino `192.168.15.254` (IP da interface WAN do firewall) |
-| `DenyAllFromWanToLan` | 4000 | Bloqueia tráfego da `WANSubnet` (`192.168.14.0/23`) direto para as redes internas (`10.172.28.0/22` + `10.172.32.0/24`), forçando a passagem pelo firewall |
+| `DenyAllFromWanToLan` | 4000 | Bloqueia tráfego da `WANSubnet` (`192.168.14.0/23`) direto para as redes internas (`10.172.28.0/22`, que cobre LAN + AVD), forçando a passagem pelo firewall |
 
-> Atenção: como `DenyInternetInbound` (prioridade 200) é avaliada **antes**
-> de `AllowAllInToFirewall` (3990), qualquer tráfego que o Azure já classifique
-> com a tag `Internet` continua sendo bloqueado antes de chegar na regra de
-> permissão do firewall. Se a intenção é o Mikrotik receber tráfego vindo da
-> internet pública de fato (não só da rede WAN privada), essa regra 200
-> precisa ser revista.
->
-> O range de destino pedido originalmente para `DenyAllFromWanToLan`
-> (`10.172.30.0/22`) também não é um CIDR válido pelo mesmo motivo do
-> `vnet_address_space` — foi substituído pelos dois blocos reais
-> (`10.172.28.0/22` + `10.172.32.0/24`) via `destination_address_prefixes`.
+> A regra `DenyInternetInbound` (que bloqueava toda a tag `Internet`) foi
+> removida do `nsg-wan-eastus2` de propósito: ela bloquearia qualquer
+> tráfego vindo da internet pública antes mesmo de chegar na regra
+> `AllowAllInToFirewall`, impedindo o Mikrotik de receber tráfego externo.
+> O controle de acesso de borda agora é feito inteiramente pelo próprio
+> RouterOS. As NSGs `nsg-lan-eastus2` e `nsg-avd-eastus2` mantêm o
+> `DenyInternetInbound` normalmente.
 
 ### Por que o VHD não é gerenciado 100% pelo Terraform
 
@@ -193,8 +189,5 @@ acima (apply do storage → workflow de preparo do VHD → `deploy_mikrotik_fire
   definido.
 - Avaliar Private Endpoints / Azure Firewall na `WANSubnet` se a topologia
   evoluir para hub-and-spoke.
-- Revisar a interação entre `DenyInternetInbound` (prioridade 200) e
-  `AllowAllInToFirewall` (3990) no `nsg-wan-eastus2` caso o firewall precise
-  receber tráfego da internet pública de fato.
 - Licenciamento do RouterOS (BYOL): comprar/aplicar a licença direto no
   Mikrotik depois que a VM subir — não é gerenciado pelo Terraform.

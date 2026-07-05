@@ -67,20 +67,19 @@ resource "azurerm_network_security_group" "wan" {
   # passe pelo firewall Mikrotik (que tem suas proprias regras de roteamento
   # dentro do RouterOS) em vez de trafegar direto pela rede do Azure.
   #
-  # OBS: o range pedido originalmente (10.172.30.0/22) nao e um CIDR valido
-  # (30 nao e multiplo de 4 para /22) e tambem nao cobre a AVDSubnet. Foi
-  # substituido pelos dois blocos reais usados no address_space da VNet:
-  # 10.172.28.0/22 (contem a LANSubnet) e 10.172.32.0/24 (AVDSubnet).
+  # LANSubnet (10.172.29.0/24) e AVDSubnet (10.172.30.0/24) cabem as duas
+  # dentro do bloco 10.172.28.0/22, entao um unico destination_address_prefix
+  # ja cobre as duas subnets internas.
   security_rule {
-    name                         = "DenyAllFromWanToLan"
-    priority                     = 4000
-    direction                    = "Inbound"
-    access                       = "Deny"
-    protocol                     = "*"
-    source_port_range            = "*"
-    destination_port_range       = "*"
-    source_address_prefix        = "192.168.14.0/23"
-    destination_address_prefixes = ["10.172.28.0/22", "10.172.32.0/24"]
+    name                       = "DenyAllFromWanToLan"
+    priority                   = 4000
+    direction                  = "Inbound"
+    access                     = "Deny"
+    protocol                   = "*"
+    source_port_range          = "*"
+    destination_port_range     = "*"
+    source_address_prefix      = "192.168.14.0/23"
+    destination_address_prefix = "10.172.28.0/22"
   }
 }
 

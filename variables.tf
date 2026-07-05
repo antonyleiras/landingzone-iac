@@ -42,15 +42,15 @@ variable "vnet_name" {
   default     = "vnet-infra-eastus2"
 }
 
-# Lista de espacos de enderecamento da VNet, dividida em 3 blocos porque o
-# range original pensado para LAN+AVD (10.172.30.0/22) nao e um limite de
-# rede valido (30 nao e multiplo de 4 para /22) e tambem nao cobria a
-# AVDSubnet. Por isso: 10.172.28.0/22 (cobre .28-.31, contem a LANSubnet) +
-# 10.172.32.0/24 (contem a AVDSubnet), separado do bloco da WANSubnet.
+# Lista de espacos de enderecamento da VNet. LANSubnet (10.172.29.0/24) e
+# AVDSubnet (10.172.30.0/24) agora cabem dentro do mesmo bloco
+# 10.172.28.0/22 (cobre .28-.31), entao o bloco separado 10.172.32.0/24
+# que existia antes para a AVDSubnet foi removido por nao ser mais
+# necessario.
 variable "vnet_address_space" {
   description = "Lista de blocos CIDR de enderecamento da VNet."
   type        = list(string)
-  default     = ["192.168.14.0/23", "10.172.28.0/22", "10.172.32.0/24"]
+  default     = ["192.168.14.0/23", "10.172.28.0/22"]
 }
 
 variable "wan_subnet_prefix" {
@@ -62,13 +62,13 @@ variable "wan_subnet_prefix" {
 variable "lan_subnet_prefix" {
   description = "Prefixo da LANSubnet."
   type        = string
-  default     = "10.172.31.0/24"
+  default     = "10.172.29.0/24"
 }
 
 variable "avd_subnet_prefix" {
   description = "Prefixo da AVDSubnet (usada pelo projeto avd-entra-iac para os session hosts e o storage do FSLogix)."
   type        = string
-  default     = "10.172.32.0/24"
+  default     = "10.172.30.0/24"
 }
 
 variable "nsg_wan_name" {
@@ -120,7 +120,7 @@ variable "mikrotik_upload_principal_object_id" {
 # mikrotik-vhd-prepare.yml antes de virar true).
 variable "deploy_mikrotik_firewall" {
   type    = bool
-  default = true
+  default = false
 }
 
 variable "firewall_name" {
@@ -150,7 +150,7 @@ variable "firewall_wan_private_ip" {
 variable "firewall_lan_private_ip" {
   description = "IP privado estatico da interface LAN do firewall."
   type        = string
-  default     = "10.172.31.254"
+  default     = "10.172.29.254"
 }
 
 variable "firewall_create_wan_public_ip" {
