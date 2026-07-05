@@ -132,7 +132,7 @@ variable "firewall_name" {
 variable "firewall_vm_size" {
   description = "SKU da VM do firewall Mikrotik CHR."
   type        = string
-  default     = "Standard_B2ts_v2"
+  default     = "Standard_B2ats_v2"
 }
 
 variable "firewall_disk_type" {
