@@ -16,11 +16,25 @@ Subscription
                              Gallery (sem recursos ainda)
 ```
 
-| Subnet | Uso pretendido | NSG |
-|---|---|---|
-| `WANSubnet` | Saída/entrada externa (gateway, firewall, etc. quando existirem) | `nsg-<prefix>-wan` |
-| `LANSubnet` | Tráfego interno geral | `nsg-<prefix>-lan` |
-| `AVDSubnet` | Session hosts e storage FSLogix do projeto `avd-entra-iac` | `nsg-<prefix>-avd` |
+A VNet tem 3 blocos de endereçamento (`address_space` é uma lista), porque as
+subnets pedidas caem em faixas não contíguas:
+
+| Bloco da VNet | Cobre |
+|---|---|
+| `192.168.14.0/23` | `WANSubnet` |
+| `10.172.28.0/22` | `LANSubnet` |
+| `10.172.32.0/24` | `AVDSubnet` |
+
+> O range original pensado para LAN+AVD (`10.172.30.0/22`) não é um limite
+> de rede válido para `/22` (o terceiro octeto precisa ser múltiplo de 4) e
+> também não cobria a `AVDSubnet` (`10.172.32.0/24` fica fora desse `/22`).
+> Por isso o espaço foi dividido em dois blocos.
+
+| Subnet | CIDR | Uso pretendido | NSG |
+|---|---|---|---|
+| `WANSubnet` | `192.168.15.0/24` | Saída/entrada externa (gateway, firewall, etc. quando existirem) | `nsg-wan-eastus2` |
+| `LANSubnet` | `10.172.31.0/24` | Tráfego interno geral | `nsg-lan-eastus2` |
+| `AVDSubnet` | `10.172.32.0/24` | Session hosts e storage FSLogix do projeto `avd-entra-iac` | `nsg-avd-eastus2` |
 
 ## Pré-requisitos
 

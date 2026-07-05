@@ -25,13 +25,16 @@ module "networking" {
 
   resource_group_name = azurerm_resource_group.infra.name
   location            = var.location
-  name_prefix         = var.name_prefix
 
   vnet_name          = var.vnet_name
   vnet_address_space = var.vnet_address_space
   wan_subnet_prefix  = var.wan_subnet_prefix
   lan_subnet_prefix  = var.lan_subnet_prefix
   avd_subnet_prefix  = var.avd_subnet_prefix
+
+  nsg_wan_name = var.nsg_wan_name
+  nsg_lan_name = var.nsg_lan_name
+  nsg_avd_name = var.nsg_avd_name
 
   tags = local.common_tags
 }

@@ -2,7 +2,7 @@ resource "azurerm_virtual_network" "this" {
   name                = var.vnet_name
   resource_group_name = var.resource_group_name
   location            = var.location
-  address_space       = [var.vnet_address_space]
+  address_space       = var.vnet_address_space
   tags                = var.tags
 }
 
@@ -33,10 +33,10 @@ resource "azurerm_subnet" "avd" {
   service_endpoints = ["Microsoft.Storage"]
 }
 
-# --- Network Security Groups (um por subnet) ---
+# --- Network Security Groups (um por subnet, nomes explicitos) ---
 
 resource "azurerm_network_security_group" "wan" {
-  name                = "nsg-${var.name_prefix}-wan"
+  name                = var.nsg_wan_name
   resource_group_name = var.resource_group_name
   location            = var.location
   tags                = var.tags
@@ -55,7 +55,7 @@ resource "azurerm_network_security_group" "wan" {
 }
 
 resource "azurerm_network_security_group" "lan" {
-  name                = "nsg-${var.name_prefix}-lan"
+  name                = var.nsg_lan_name
   resource_group_name = var.resource_group_name
   location            = var.location
   tags                = var.tags
@@ -74,7 +74,7 @@ resource "azurerm_network_security_group" "lan" {
 }
 
 resource "azurerm_network_security_group" "avd" {
-  name                = "nsg-${var.name_prefix}-avd"
+  name                = var.nsg_avd_name
   resource_group_name = var.resource_group_name
   location            = var.location
   tags                = var.tags

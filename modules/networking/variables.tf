@@ -6,18 +6,14 @@ variable "location" {
   type = string
 }
 
-variable "name_prefix" {
-  description = "Usado apenas na nomenclatura dos NSGs (nsg-<name_prefix>-wan/lan/avd)."
-  type        = string
-}
-
 variable "vnet_name" {
   description = "Nome explicito da VNet (ex: vnet-infra-eastus2)."
   type        = string
 }
 
 variable "vnet_address_space" {
-  type = string
+  description = "Lista de espacos de enderecamento da VNet (pode ter mais de um bloco CIDR)."
+  type        = list(string)
 }
 
 variable "wan_subnet_prefix" {
@@ -30,6 +26,21 @@ variable "lan_subnet_prefix" {
 
 variable "avd_subnet_prefix" {
   type = string
+}
+
+variable "nsg_wan_name" {
+  description = "Nome explicito do NSG da WANSubnet."
+  type        = string
+}
+
+variable "nsg_lan_name" {
+  description = "Nome explicito do NSG da LANSubnet."
+  type        = string
+}
+
+variable "nsg_avd_name" {
+  description = "Nome explicito do NSG da AVDSubnet."
+  type        = string
 }
 
 variable "tags" {
