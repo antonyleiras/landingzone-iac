@@ -34,3 +34,28 @@ output "lan_nsg_id" {
 output "avd_nsg_id" {
   value = module.networking.avd_nsg_id
 }
+
+output "mikrotik_storage_account_name" {
+  value = module.mikrotik.storage_account_name
+}
+
+output "mikrotik_vhd_upload_target_url" {
+  description = "URL do blob de destino onde o workflow mikrotik-vhd-prepare.yml deve subir o VHD fixo do CHR."
+  value       = module.mikrotik.vhd_upload_target_url
+}
+
+output "firewall_vm_id" {
+  value = module.mikrotik.firewall_vm_id
+}
+
+output "firewall_wan_public_ip" {
+  value = module.mikrotik.firewall_wan_public_ip
+}
+
+output "firewall_wan_private_ip" {
+  value = module.mikrotik.firewall_wan_private_ip
+}
+
+output "firewall_lan_private_ip" {
+  value = module.mikrotik.firewall_lan_private_ip
+}
