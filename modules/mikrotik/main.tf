@@ -12,7 +12,7 @@ resource "azurerm_storage_account" "vhds" {
   account_kind             = "StorageV2"
 
   min_tls_version               = "TLS1_2"
-  enable_https_traffic_only     = true
+  https_traffic_only_enabled    = true
   public_network_access_enabled = true
 
   tags = var.tags
@@ -20,7 +20,7 @@ resource "azurerm_storage_account" "vhds" {
 
 resource "azurerm_storage_container" "vhds" {
   name                  = var.container_name
-  storage_account_id    = azurerm_storage_account.vhds.id
+  storage_account_name  = azurerm_storage_account.vhds.name
   container_access_type = "private"
 }
 
