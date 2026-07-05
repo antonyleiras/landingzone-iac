@@ -120,7 +120,7 @@ variable "mikrotik_upload_principal_object_id" {
 # mikrotik-vhd-prepare.yml antes de virar true).
 variable "deploy_mikrotik_firewall" {
   type    = bool
-  default = false
+  default = true
 }
 
 variable "firewall_name" {
