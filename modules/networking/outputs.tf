@@ -25,3 +25,7 @@ output "lan_nsg_id" {
 output "avd_nsg_id" {
   value = azurerm_network_security_group.avd.id
 }
+
+output "lan_route_table_id" {
+  value = azurerm_route_table.lan.id
+}

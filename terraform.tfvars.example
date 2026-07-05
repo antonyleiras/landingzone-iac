@@ -20,6 +20,8 @@ nsg_wan_name = "nsg-wan-eastus2"
 nsg_lan_name = "nsg-lan-eastus2"
 nsg_avd_name = "nsg-avd-eastus2"
 
+route_table_lan_name = "rt-lan-eastus2"
+
 # --- Firewall Mikrotik CHR (aslfwus2) ---
 mikrotik_storage_account_name       = "stgacctaslinfraus2"
 mikrotik_vhd_container_name         = "vhds"

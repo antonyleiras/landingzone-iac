@@ -89,6 +89,12 @@ variable "nsg_avd_name" {
   default     = "nsg-avd-eastus2"
 }
 
+variable "route_table_lan_name" {
+  description = "Nome explicito da route table associada as subnets LANSubnet e AVDSubnet, com a rota default apontando para o firewall Mikrotik."
+  type        = string
+  default     = "rt-lan-eastus2"
+}
+
 # --- Firewall Mikrotik CHR (aslfwus2) ---
 
 variable "mikrotik_storage_account_name" {

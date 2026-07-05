@@ -36,6 +36,9 @@ module "networking" {
   nsg_lan_name = var.nsg_lan_name
   nsg_avd_name = var.nsg_avd_name
 
+  route_table_lan_name    = var.route_table_lan_name
+  firewall_lan_private_ip = var.firewall_lan_private_ip
+
   tags = local.common_tags
 }
 

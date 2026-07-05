@@ -43,6 +43,17 @@ variable "nsg_avd_name" {
   type        = string
 }
 
+variable "route_table_lan_name" {
+  description = "Nome explicito da route table associada as subnets LAN e AVD."
+  type        = string
+  default     = "rt-lan-eastus2"
+}
+
+variable "firewall_lan_private_ip" {
+  description = "IP privado da interface LAN do firewall Mikrotik, usado como next hop da rota default (0.0.0.0/0)."
+  type        = string
+}
+
 variable "tags" {
   type    = map(string)
   default = {}

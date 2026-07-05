@@ -163,3 +163,35 @@ resource "azurerm_subnet_network_security_group_association" "avd" {
   subnet_id                 = azurerm_subnet.avd.id
   network_security_group_id = azurerm_network_security_group.avd.id
 }
+
+# --- Route table (LANSubnet + AVDSubnet -> firewall Mikrotik) ---
+
+resource "azurerm_route_table" "lan" {
+  name                = var.route_table_lan_name
+  resource_group_name = var.resource_group_name
+  location            = var.location
+  tags                = var.tags
+}
+
+# Rota default: todo trafego sem rota mais especifica (0.0.0.0/0) e
+# encaminhado para a interface LAN do firewall Mikrotik, que decide o que
+# fazer com ele (NAT de saida, inspecao, etc.) em vez de sair direto pelo
+# roteamento padrao do Azure.
+resource "azurerm_route" "default_via_firewall" {
+  name                   = "default"
+  resource_group_name    = var.resource_group_name
+  route_table_name       = azurerm_route_table.lan.name
+  address_prefix         = "0.0.0.0/0"
+  next_hop_type          = "VirtualAppliance"
+  next_hop_in_ip_address = var.firewall_lan_private_ip
+}
+
+resource "azurerm_subnet_route_table_association" "lan" {
+  subnet_id      = azurerm_subnet.lan.id
+  route_table_id = azurerm_route_table.lan.id
+}
+
+resource "azurerm_subnet_route_table_association" "avd" {
+  subnet_id      = azurerm_subnet.avd.id
+  route_table_id = azurerm_route_table.lan.id
+}

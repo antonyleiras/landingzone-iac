@@ -35,6 +35,10 @@ output "avd_nsg_id" {
   value = module.networking.avd_nsg_id
 }
 
+output "lan_route_table_id" {
+  value = module.networking.lan_route_table_id
+}
+
 output "mikrotik_storage_account_name" {
   value = module.mikrotik.storage_account_name
 }

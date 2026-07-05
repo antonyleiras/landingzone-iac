@@ -37,6 +37,21 @@ A VNet tem 2 blocos de endereçamento (`address_space` é uma lista):
 | `LANSubnet` | `10.172.29.0/24` | Firewall Mikrotik (interface LAN, IP `.254`) + tráfego interno | `nsg-lan-eastus2` |
 | `AVDSubnet` | `10.172.30.0/24` | Session hosts e storage FSLogix do projeto `avd-entra-iac` | `nsg-avd-eastus2` |
 
+## Roteamento (`rt-lan-eastus2`)
+
+Route table associada à `LANSubnet` e à `AVDSubnet`, com uma única rota:
+
+| Rota | Destino | Next hop | Efeito |
+|---|---|---|---|
+| `default` | `0.0.0.0/0` | Virtual Appliance → `10.172.29.254` (interface LAN do firewall) | Todo tráfego sem rota mais específica das duas subnets passa pelo Mikrotik antes de sair |
+
+> Como consequência, o tráfego de saída para internet dos session hosts do
+> AVD (`avd-entra-iac`) e de qualquer host na `LANSubnet` passa a depender do
+> firewall estar no ar e ter uma regra de NAT/roteamento configurada na
+> interface WAN — sem isso, esse tráfego para de funcionar. Configure o NAT
+> de saída (masquerade) no RouterOS antes de colocar cargas de produção
+> nessas subnets.
+
 ## Firewall Mikrotik CHR (`aslfwus2`)
 
 VM com 2 interfaces de rede, roteando tráfego entre a `WANSubnet` e a
