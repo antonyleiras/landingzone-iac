@@ -43,7 +43,13 @@ resource "azurerm_network_security_group" "wan" {
 
   # Permite trafego destinado a interface WAN do firewall Mikrotik
   # (aslfwus2, IP estatico 192.168.15.254). Prioridade menor que
-  # DenyAllFromWanToLan e DenyInternetInbound para ser avaliada primeiro.
+  # DenyAllFromWanToLan para ser avaliada primeiro.
+  #
+  # OBS: a regra generica "DenyInternetInbound" (que existia aqui antes) foi
+  # removida de proposito nesta NSG -- ela bloquearia todo trafego vindo da
+  # tag "Internet" antes mesmo de chegar na regra abaixo, impedindo o
+  # firewall de receber trafego da internet publica. O controle de acesso
+  # de borda agora fica inteiramente a cargo do proprio RouterOS.
   security_rule {
     name                       = "AllowAllInToFirewall"
     priority                   = 3990
@@ -75,18 +81,6 @@ resource "azurerm_network_security_group" "wan" {
     destination_port_range       = "*"
     source_address_prefix        = "192.168.14.0/23"
     destination_address_prefixes = ["10.172.28.0/22", "10.172.32.0/24"]
-  }
-
-  security_rule {
-    name                       = "DenyInternetInbound"
-    priority                   = 200
-    direction                  = "Inbound"
-    access                     = "Deny"
-    protocol                   = "*"
-    source_port_range          = "*"
-    destination_port_range     = "*"
-    source_address_prefix      = "Internet"
-    destination_address_prefix = "*"
   }
 }
 
