@@ -1,0 +1,23 @@
+# Terraform
+**/.terraform/*
+*.tfstate
+*.tfstate.*
+*.tfplan
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+.terraformrc
+terraform.rc
+
+# Segredos locais
+*.tfvars
+!terraform.tfvars.example
+*.pfx
+*.pem
+
+# OS / editor
+.DS_Store
+.vscode/
