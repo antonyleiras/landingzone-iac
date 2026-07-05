@@ -66,16 +66,23 @@ jobs:
         if: steps.check.outputs.exists == 'false' || github.event.inputs.force_overwrite == 'true'
         run: |
           VHDX_FILE=$(ls *.vhdx)
-          qemu-img convert -f vhdx -O vpc -o subformat=fixed "$VHDX_FILE" chr.vhd
 
-          # Azure exige que o tamanho do VHD seja multiplo de 1 MiB.
-          SIZE=$(stat -c%s chr.vhd)
+          # O driver "vpc" (VHD) do qemu-img nao suporta resize em formato
+          # fixed. Por isso convertemos primeiro para RAW (que suporta
+          # resize), alinhamos o tamanho para um multiplo de 1 MiB (exigido
+          # pelo Azure) nesse intermediario, e so depois convertemos o RAW
+          # ja alinhado para VHD fixo.
+          qemu-img convert -f vhdx -O raw "$VHDX_FILE" chr.raw
+
+          SIZE=$(stat -c%s chr.raw)
           ALIGN=$((1024 * 1024))
           REMAINDER=$((SIZE % ALIGN))
           if [ "$REMAINDER" -ne 0 ]; then
             NEWSIZE=$(((SIZE / ALIGN + 1) * ALIGN))
-            qemu-img resize -f vpc chr.vhd "$NEWSIZE"
+            qemu-img resize -f raw chr.raw "$NEWSIZE"
           fi
+
+          qemu-img convert -f raw -O vpc -o subformat=fixed,force_size chr.raw chr.vhd
 
       - name: Upload do VHD para o Storage Account (page blob)
         if: steps.check.outputs.exists == 'false' || github.event.inputs.force_overwrite == 'true'
